@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Multiple GeoJSON Files</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <style>
+        #map { 
+            height: 500px; 
+            width: 100%; 
+        }
+        .search-control { 
+            padding: 10px; 
+            background: white; 
+            position: absolute; 
+            bottom: 0; 
+            left: 0; 
+            width: 100%; 
+            box-sizing: border-box;
+        }
+        .search-control input, 
+        .search-control button { 
+            margin: 5px; 
+        }
+        .search-control .search-group {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="search-control">
+        <div class="search-group">
+            <h3>Search Street</h3>
+            <input type="text" id="searchQuery" placeholder="Enter PN_NAME_FR">
+            <button id="searchButton">Search</button>
+        </div>
+        <div class="search-group">
+            <h3>Search Building</h3>
+            <input type="text" id="streetName" placeholder="Enter Street Name">
+            <input type="text" id="streetNumber" placeholder="Enter Number">
+            <button id="searchBuildingButton">Search</button>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([50.85045, 4.34878], 12); // Centered on Brussels
+
+        // Add a tile layer (background map)
+        var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+        }).addTo(map);
+
+        // Initialize layer control
+        var baseLayers = {
+            "OpenStreetMap": osmLayer
+        };
+        var overlays = {};
+
+        
+
+        // Define GeoJSON URLs
+
+        // Store layer references
+        const geojsonLayers = {};
+
+        // Function to fetch and add GeoJSON layers with default styling
+        function loadGeoJSONLayer(name, url, styleFunction) {
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    geojsonLayers[name] = L.geoJson(data, {
+                        style: styleFunction
+                    }).addTo(map);  // Add the layer to the map
+
+                    // Add the GeoJSON layer to the overlays for the layer control
+                    overlays[name] = geojsonLayers[name];
+
+                    // Optionally fit map bounds to the GeoJSON data
+                    var bounds = L.geoJson(data).getBounds();
+                    map.fitBounds(bounds);
+
+                    // Refresh the layer control to ensure it reflects the new layer
+                    layerControl.addOverlay(geojsonLayers[name], name);
+                })
+                .catch(error => console.error(`Error loading ${name}:`, error));
+        }
+
+        // Default style function
+        function layerStyle(color, fillColor, weight, fillOpacity) {
+            return {
+                color: color,
+                weight: weight, 
+                fillColor: fillColor,
+                fillOpacity: fillOpacity
+            };
+        }
+
+
+        // Add layer control to map
+        var layerControl = L.control.layers(baseLayers, overlays).addTo(map);
+
+        // Function to search and highlight features by calling the API
+        let previousLayer = null;
+
+        function searchByPNName(name) {
+            fetch(`http://localhost:5000/search_street?street_name=${encodeURIComponent(name)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Street not found');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Remove the previous layer if it exists
+                    if (previousLayer) {
+                        map.removeLayer(previousLayer);
+                    }
+
+                    // Add the returned GeoJSON layer to the map with red styling
+                    previousLayer = L.geoJson(data, {
+                        style: layerStyle('red', 'red', 2, 0.5)
+                    }).addTo(map);
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Search button event listener
+        document.getElementById('searchButton').addEventListener('click', () => {
+            const query = document.getElementById('searchQuery').value;
+            searchByPNName(query);
+        });
+
+        // Function to search and highlight buildings by calling the API
+        let previousBuildingLayer = null;
+
+        function searchBuildingByAddress(street, number) {
+            fetch(`http://localhost:5000/search_building?street=${encodeURIComponent(street)}&number=${encodeURIComponent(number)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Building not found');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Remove the previous building layer if it exists
+                    if (previousBuildingLayer) {
+                        map.removeLayer(previousBuildingLayer);
+                    }
+
+                    // Add the returned GeoJSON layer to the map with blue styling
+                    previousBuildingLayer = L.geoJson(data, {
+                        style: layerStyle('blue', 'blue', 2, 0.5)
+                    }).addTo(map);
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Search button event listener for buildings
+        document.getElementById('searchBuildingButton').addEventListener('click', () => {
+            const street = document.getElementById('streetName').value;
+            const number = document.getElementById('streetNumber').value;
+            searchBuildingByAddress(street, number);
+        });
+    </script>
+</body>
+</html>

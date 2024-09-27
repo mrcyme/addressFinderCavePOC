@@ -1,0 +1,5 @@
+geopandas,
+fuzzywuzzy,
+python-Levenshtein,
+Flask,
+Flask-Cors
