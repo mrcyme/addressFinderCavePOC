@@ -21,10 +21,6 @@ This project is a web application that displays multiple GeoJSON files on a map 
 ## Installation
 
 1. Clone the repository:
-    ```bash
-    git clone https://github.com/yourusername/geojson-display-app.git
-    cd geojson-display-app
-    ```
 
 2. Install the required Python packages:
     ```bash
